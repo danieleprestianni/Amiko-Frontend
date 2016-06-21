@@ -1,0 +1,226 @@
+org.thingml.bglib.gui.BLEExplorerFrame.main:
+>il metodo va replicato esattamente come è ad oggi
+
+
+
+
+https://www.bluegiga.com/protectedstore/8pHYFByrRbCfvauWLt5CMQ/l_KpkPI6LBzfWoeFZ-gZvQ/v3xTxzOQ-S3QRA4Ov9nEQRg64DUGE4FbdT9YeJKCOdQljsvdne_b/Bluetooth_Smart_Software_Release_Notes-v143.pdf
+Changes: 1.1.0 Beta compared to 1.0.3
+Multi-connection support added to the master side (i.e., central). Verified up to 4 simultaneous 
+connections.
+API's supporting the cable replacement use case, e.g., for enabling E2E flow control
+Chipset's PWM capability accessible via BGAPI.
+BGAPI changes for I2C usage
+Multiple new BG script features such as logical AND, WHILE loop, bit shifting.
+Flexible build-time memory management added, e.g., removing BGscript size limitation when operating 
+with the available flash memory size
+Several smaller improvements for quality and stability.
+Note: Final 1.1.0 SW release will require the Bluegiga license key at the module and this will need to be entered 
+to the modules through the programming pins
+
+
+GAP
+ - Generic Access Profile toolbar, which allows you to control the visibility, connectability, broadcast
+and scanning modes of a device
+
+Nordic_UART
+- Client
+-- Nordic UART Service
+UUID: 6e400001-b5a3
+--- TX Charact
+UUID: 6e400003
+property: notify
+Desc: Client Characteristic config
+UUID: 0x2902
+
+--- RX Charact
+property: write, write no response
+
+
+
+
+Handle 9
+UUID: 6e400001b5a3f393e0a9e50e24dcca9e
+
+
+
+
+
+
+
+
+
+
+HOW TO:
+1) WRITE on 
+Service Nordic UART Service
+handle: 9
+Group: 65535
+UUID: 6e400001b5a3f393e0a9e50e24dcca9e
+
+Characteristic:
+UUID: 6e400002b5a3f393e0a9e50e24dcca9e
+Hnadle: 14
+
+
+2) READ from
+Service Nordic UART Service
+handle: 9
+Group: 65535
+UUID: 6e400001b5a3f393e0a9e50e24dcca9e
+
+Characteristic:
+UUID: 6e400003b5a3f393e0a9e50e24dcca9e
+Hnadle: 11
+
+
+-----------------------
+User press button
+-->
+jButtonBLED112Conn.setText("Connect");
+        jButtonBLED112Conn.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButtonBLED112ConnActionPerformed(evt);
+            }
+        });
+---->        
+jButtonBLED112ConnActionPerformed 
+------>
+BGAPITransport.run() Runnable
+-----------------------
+
+
+-----------------------
+-----------------------
+
+
+-----------------------
+BGAPI: packetReceived
+handler di tutti i acchetti ricevuti; li analizza sulla base 
+packet.getMsgType() != 0 && packet.classID == 2
+Il  metodo viene invocato da un thread in modo continuativo (loop)
+-->
+BGAPI: receive_attributes_evt 
+----> BGAPI: receive_attributes_value
+
+
+
+-----------------------------------------------------------------
+Come collegarsi alla porta sulla quale è presente BLED112:
+port  = BLED112.connectSerial(BLED112.selectSerialPort());
+        if (port != null) {
+            try {
+                jTextFieldBLED112.setText("Connected on " + port);
+                bgapi = new BGAPI(new BGAPITransport(port.getInputStream(), port.getOutputStream()));
+                bgapi.addListener(this);
+                Thread.sleep(250);
+                bgapi.send_system_get_info();
+                jButtonBLED112Disc.setEnabled(true);
+                if (jCheckBoxDebug.isSelected()) bgapi.getLowLevelDriver().addListener(logger);
+                
+            } catch (Exception ex) {
+                Logger.getLogger(BLEExplorerFrame.class.getName()).log(Level.SEVERE, null, ex);
+                jTextFieldBLED112.setText("Exception while connecting to " + port);
+                jButtonBLED112Conn.setEnabled(true);
+            }
+        }
+        else {
+            jTextFieldBLED112.setText("Not Connected.");
+            jButtonBLED112Conn.setEnabled(true);
+        }
+        
+        
+Quando faccio il discovery dei device BLE INVOCO IL METODO
+jButtonBLED112DiscActionPerformed:
+
+
+jButtonBLED112Disc.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButtonBLED112DiscActionPerformed(evt);
+            }
+        });        
+
+
+
+
+i codice per la disconnessione è:
+        if (bgapi != null) {
+            bgapi.removeListener(this);
+            bgapi.getLowLevelDriver().removeListener(logger);
+            bgapi.send_system_reset(0);
+            bgapi.disconnect();
+        }
+        if (port != null) {
+            port.close();
+        }
+        bgapi = null;
+        port = null;
+        
+        
+        
+il pulsante per il discove è:
+jButtonDiscover.setText("Discover");
+
+al quale è associato l'handler:
+
+jButtonDiscoverActionPerformed
+private void jButtonDiscoverActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonDiscoverActionPerformed
+        devList.clear();
+        jListDevices.setModel(devList);
+        bgapi.send_gap_set_scan_parameters(10, 250, 1);
+        bgapi.send_gap_discover(1);
+        jButtonDiscover.setEnabled(false);
+        jButtonStopDiscover.setEnabled(true);
+    }//GEN-LAST:event_jButtonDiscoverActionPerformed   
+    
+
+
+
+il comando di discover prevede una callback:
+
+il comando è:bgapi.send_gap_discover(1);    
+
+la callback è;
+public void receive_gap_scan_response(int rssi, int packet_type, BDAddr sender, int address_type, int bond, byte[] data) {
+            BLEDevice d = devList.getFromAddress(sender.toString());
+            if (d == null) { 
+                d = new BLEDevice(sender.toString());
+                devList.add(d);
+                System.out.println("Create device: " + d.toString());
+            }
+            String name = new String(data).trim();
+            if (d.getName().length() < name.length()) d.setName(name);
+            d.setRssi(rssi);
+            devList.changed(d);
+        }         
+        
+        
+        
+Adesso serve collegarsi con uno specifico device BLE; quando faccio click
+sul secondo pulsante di Connect eseguo questo codice:
+
+private void jButtonConnectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonConnectActionPerformed
+        
+        BLEDevice d = (BLEDevice) jListDevices.getSelectedValue();
+        if (d == null) return;
+        
+        jButtonConnect.setEnabled(false);
+        jButtonDisconnect.setEnabled(true);
+        
+        bgapi.send_gap_connect_direct(BDAddr.fromString(d.getAddress()), 1, 0x3C, 0x3C, 0x64,0);
+    }//GEN-LAST:event_jButtonConnectActionPerformed   
+    
+
+
+Dopo aver invocato la "send_gap_connect_direct" attendo per la relativa notifica:
+receive_gap_connect_direct
+
+
+Dopo la receive_gap_connect_direct ricevo anche la receive_attclient_procedure_completed
+      
+
+
+la receive_gap_connect_direct mi fornisce il parametro connection_handle
+che potrebbe essere utile
+
+   

@@ -1,0 +1,5 @@
+io.amiko.app.devices
+io.amiko.app.devices.bledriver
+io.amiko.app.devices.bledriver.bluegiga
+io.amiko.app.doctorsapp.demo
+org.eclipse.wb.swt
